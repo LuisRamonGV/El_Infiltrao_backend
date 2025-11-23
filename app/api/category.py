@@ -1,35 +1,45 @@
-from fastapi import APIRouter
-from app.core.firebase import db
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from app.models.category_model import ( CategoryCreate, CategoryResponse, CategoryUpdate )
+from app.repositories.category_repository import CategoryRepository
 
 router = APIRouter()
 
-@router.get("/")
-async def get_categories():
-    docs = db.collection("categories").stream()
-    categories = [{ "id": doc.id, **doc.to_dict() } for doc in docs]
-    return categories
+@router.get("", response_model=list[CategoryResponse])
+def get_categories():
+    """Obtiene todas las categorías."""
+    return CategoryRepository.get_all()
 
-class Category(BaseModel):
-    name: str
-    description: str | None = None
+@router.post("", response_model=CategoryResponse)
+def add_category(data: CategoryCreate):
+    """Crea una nueva categoría."""
+    try:
+        return CategoryRepository.create(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/")
-async def add_category(category: Category):
-    doc_ref = db.collection("categories").document()
-    doc_ref.set(category.dict())
-    return { "id": doc_ref.id, **category.dict() }
+@router.get("/{category_id}", response_model=CategoryResponse)
+def get_category(category_id: str):
+    """Obtiene una categoría por ID."""
+    category = CategoryRepository.get(category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category
 
+@router.put("/{category_id}", response_model=CategoryResponse)
+def update_category(category_id: str, data: CategoryUpdate):
+    try:
+        updated = CategoryRepository.update(category_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    if not updated:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return updated
 
-@router.get("/{category_id}")
-async def get_category(category_id: str):
-    doc = db.collection("categories").document(category_id).get()
-    if not doc.exists:
-        return {"error": "not found"}
-    return {"id": doc.id, **doc.to_dict()}
+@router.delete("/{category_id}", response_model=CategoryResponse)
+def delete_category(category_id: str):
+    deleted = CategoryRepository.delete(category_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Category not found")
 
-@router.delete("/{category_id}")
-async def delete_category(category_id: str):
-    db.collection("categories").document(category_id).delete()
-    return { "status": "deleted" }
-
+    return deleted
