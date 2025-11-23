@@ -1,0 +1,16 @@
+credentials/
+
+*.env
+
+app/core/firebase.py
+
+*.json
+
+.vscode/
+
+*.pyc
+__pycache__/
+
+.venv/
+venv/
+env/
